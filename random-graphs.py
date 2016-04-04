@@ -15,8 +15,8 @@ while (success == False):
     perm = random.permutation(3*N)
 # Then glue them together by groups of 3
     for i in range(0, 3*N/2):
-        vertex1 = perm[2*i]/3
-        vertex2 = perm[2*i+1]/3
+        vertex1 = str(perm[2*i]/3)
+        vertex2 = str(perm[2*i+1]/3)
         if graph.edgeExists(vertex1, vertex2) or (vertex1 == vertex2): #We want a true graph
             success = False
             print "Graph failed because of double edges."
