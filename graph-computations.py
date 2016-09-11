@@ -39,12 +39,13 @@ def distrib(graph):
 def under(z,w,powz,poww):
     return (1.+abs(z)**2./4.)**powz*(1.+abs(w)**2./4.)**poww
 
-def jet1(graph, magn=0):
-    """computes the hamiltonian and its gradient, for a given position (aka first three values attached do the edge)
+def hamil(graph, magn=0):
+    """computes the hamiltonian, for a given position (aka first three values attached do the edge)
 
-    Its input is a graph with two labels on each vertex. The function transforms the graph to add a third label on each vertex, then returns the value of the hamiltonian.
-
-    If more than two labels are assigned to a vertex beforehand, this function will erase them."""
+    """
+    if not graph.graph['init']:
+        print "Graph not initialized !"
+        return Nan
     t = time.time()
     ham = 0.
     #for vertex in graph.nodes():
@@ -80,39 +81,13 @@ def jet1(graph, magn=0):
     #print "jet1 took ", time.time() - t
     return ham
 
-def jetpart(graph, v0):
-    t = time.time()
-    ham = 0.
-    modified = graph.neighbors(v0)
-    modified.append(v0)
-    for vertex in modified:
-        upz=graph.node[vertex]['upz']
-        z=graph.node[vertex]['z']
-        zbar=np.conjugate(z)
-        for nb in graph.neighbors(vertex):
-            upw=graph.node[nb]['upz']
-            w=graph.node[nb]['z']
-            #(upw,w)= graph.getVertex(nb)[:2]
-            wbar=np.conjugate(w)
-            if upz==upw:
-                ham += 1.5-abs(z-w)**2./(2.*under(z,w,1,1))
-                dzdw = -(zbar-wbar)**2./(8.*under(z,w,1,1))
-                dzdbarw = (1+zbar*w/4.)**2./(2.*under(z,w,1,1))
-            else:
-                ham += 1.5 - abs(z*w/2.-2.)**2./(2.*under(z,w,1,1))
-                dzdw= -w**2.*(1.-zbar*wbar/4.)**2./(8.*under(z,w,1,1))
-                dzdbarw=(wbar/4.)**2.*(w+zbar)**2./(2.*under(z,w,1,1))
-            graph.add_edge(vertex,nb,dzdw=dzdw)
-            graph.add_edge(vertex,nb,dzdbarw=dzdbarw)
-            graph.add_edge(vertex,nb,origin=vertex)
-    return [ham,mu]
-
 def jet2(graph,magn=0):
     """computes the second jet, for a given position (aka first three values attached do the edge)
 
-    Its input is a graph with three labels on each vertex. The function transforms the graph to add two labels on each vertex and two on each edge.
-
-    If more than three labels are assigned to a vertex beforehand, this function will erase them."""
+    """
+    if not graph.graph['init']:
+        print "Graph not initialized !"
+        return Nan
     t=time.time()
     for vertex in graph.nodes():
         graph.add_node(vertex,dzdz=0)
@@ -161,41 +136,143 @@ def jet2(graph,magn=0):
         graph.add_node(edge[0],dzdbarz=dzdbarz)
         graph.add_node(edge[1],dzdz=dwdw)
         graph.add_node(edge[1],dzdbarz=dwdbarw)
-
+    graph.graph['jetcalc']=True
+    
+def jetpart(graph,vertex,magn=0):
+    effects=[vertex]
+    for nb in graph.neighbors(vertex):
+        effects.append(nb)
+    for v in effects:
+        graph.add_node(v,dzdz=0)
+        graph.add_node(v,dzdbarz=0)
+    fulledges = graph.subgraph(effects).edges()
+    halfedges = []
+    for e in graph.edges():
+        if (e[0] in effects and e[1] not in effects):
+            halfedges.append(e)
+        if (e[1] in effects and e[0] not in effects):
+            halfedges.append(e[1::-1])
+    alledges = [e for e in fulledges]
+    alledges.extend(halfedges)
+    for edge in alledges:
+        upz=graph.node[edge[0]]['upz']
+        z=graph.node[edge[0]]['z']
+        dzdz=graph.node[edge[0]]['dzdz']
+        dzdbarz=graph.node[edge[0]]['dzdbarz']
+        upw=graph.node[edge[1]]['upz']
+        w=graph.node[edge[1]]['z']
+        dwdw=graph.node[edge[1]]['dzdz']
+        dwdbarw=graph.node[edge[1]]['dzdbarz']
+        zbar=np.conjugate(z)
+        wbar=np.conjugate(w)
+        if upz == upw:
+            dzdz -= (wbar-zbar)*(1.+zbar*w/4.)*zbar/(4.*under(z,w,1,1))
+            dzdbarz -= ((1.-abs(w)**2./4.)*(1.-abs(z)**2./4.)+(z*wbar).real)/(2.*under(z,w,1,1))
+            dwdw -= (zbar-wbar)*(1.+wbar*z/4.)*wbar/(4.*under(z,w,1,1))
+            dwdbarw -= ((1.-abs(w)**2./4.)*(1.-abs(z)**2./4.)+(z*wbar).real)/(2.*under(z,w,1,1))
+            dzdw = -(zbar-wbar)**2./(8.*under(z,w,1,1)) #OK
+            dzdbarw = (1+zbar*w/4.)**2./(2.*under(z,w,1,1)) #OK
+        else:
+            dzdz -= zbar*(1-zbar*wbar/4)*(w+zbar)/(4.*under(z,w,1,1))
+            dzdbarz -= (-(1.-abs(w)**2/4.)*(1.-abs(z)**2/4.)+(z*w).real)/(2.*under(z,w,1,1))
+            dwdw -= wbar*(1-wbar*zbar/4)*(z+wbar)/(4.*under(z,w,1,1))
+            dwdbarw -= (-(1.-abs(z)**2/4.)*(1.-abs(w)**2/4.)+(w*z).real)/(2.*under(z,w,1,1))
+            dzdw = (1.-zbar*wbar/4.)**2./(2.*under(z,w,1,1)) #OK
+            dzdbarw = -(w+zbar)**2./(8.*under(z,w,1,1))
+        if upz:
+            dzdz+=magn*zbar*zbar/4.*(1.+abs(z)**2./4.)/4.
+            dzdbarz+=-magn*(1.-abs(z)**2./4.)*(1.+abs(z)**2./4.)/4.
+        else:
+            dzdz+=-magn*zbar*zbar/4.*(1.+abs(z)**2./4.)/4.
+            dzdbarz+=magn*(1.-abs(z)**2./4.)*(1.+abs(z)**2./4.)/4.
+        if upw:
+            dwdw+=magn*wbar*wbar/4.*(1.+abs(w)**2./4.)/4.
+            dwdbarw+=-magn*(1.-abs(w)**2./4.)*(1.+abs(w)**2./4.)/4.
+        else:
+            dwdw+=-magn*wbar*wbar/4.*(1.+abs(w)**2./4.)/4.
+            dwdbarw+=magn*(1.-abs(w)**2./4.)*(1.+abs(w)**2./4.)/4.
+        graph.add_edge(edge[0],edge[1],dzdw=dzdw)
+        graph.add_edge(edge[0],edge[1],dzdbarw=dzdbarw)
+        graph.add_edge(edge[0],edge[1],origin=edge[0])
+        graph.add_node(edge[0],dzdz=dzdz)
+        graph.add_node(edge[0],dzdbarz=dzdbarz)
+        if edge in fulledges:
+            graph.add_node(edge[1],dzdz=dwdw)
+            graph.add_node(edge[1],dzdbarz=dwdbarw)
+    graph.graph['jetcalc']=True
+    
 def hess(graph,stab=0.):
+    if not graph.graph['init']:
+        print "Graph not initialized !"
+        return Nan
+    if not graph.graph['jetcalc']:
+        jet2(graph)
     t=time.time()
     """computes the Hessian with given 2-jet"""
-
     dbgraph=networkx.DiGraph()
-    ham=jet1(graph)
     for vertex in graph.nodes():
         dzdz=graph.node[vertex]['dzdz']
         dzdbarz=graph.node[vertex]['dzdbarz']+stab
         #print dzdz
         #print dzdbarz
         #(dzdz,dzdbarz)=graph.getVertex(vertex)[3:]
-        dbgraph.add_edge(str(vertex)+'x',str(vertex)+'x',val=-dzdz.imag)
-        dbgraph.add_edge(str(vertex)+'y',str(vertex)+'y',val=dzdz.imag)
-        dbgraph.add_edge(str(vertex)+'x',str(vertex)+'y',val=-dzdbarz-dzdz.real)
-        dbgraph.add_edge(str(vertex)+'y',str(vertex)+'x',val=dzdbarz-dzdz.real)
+        dbgraph.add_edge(str(vertex)+'!x',str(vertex)+'!x',val=-dzdz.imag)
+        dbgraph.add_edge(str(vertex)+'!y',str(vertex)+'!y',val=dzdz.imag)
+        dbgraph.add_edge(str(vertex)+'!x',str(vertex)+'!y',val=-dzdbarz-dzdz.real)
+        dbgraph.add_edge(str(vertex)+'!y',str(vertex)+'!x',val=dzdbarz-dzdz.real)
     for e in graph.edges():
         dzdw=graph.edge[e[0]][e[1]]['dzdw']
         dzdbarw=graph.edge[e[0]][e[1]]['dzdbarw']
         if graph.edge[e[0]][e[1]]['origin']==e[1]:
             dzdbarw = np.conjugate(dzdbarw)
-        dbgraph.add_edge(str(e[0])+'x',str(e[1])+'y',val=-(dzdbarw+dzdw).real)
-        dbgraph.add_edge(str(e[0])+'x',str(e[1])+'x',val=(-dzdbarw+dzdw).imag)
-        dbgraph.add_edge(str(e[0])+'y',str(e[1])+'y',val=-(dzdw+dzdbarw).imag)
-        dbgraph.add_edge(str(e[0])+'y',str(e[1])+'x',val=(dzdbarw-dzdw).real)
-        dbgraph.add_edge(str(e[1])+'x',str(e[0])+'y',val=-(dzdbarw+dzdw).real)
-        dbgraph.add_edge(str(e[1])+'x',str(e[0])+'x',val=(dzdw+dzdbarw).imag)
-        dbgraph.add_edge(str(e[1])+'y',str(e[0])+'y',val=(dzdbarw-dzdw).imag)
-        dbgraph.add_edge(str(e[1])+'y',str(e[0])+'x',val=(dzdbarw-dzdw).real)
-    
-    hessian = networkx.adjacency_matrix(dbgraph,weight='val').toarray()
+        dbgraph.add_edge(str(e[0])+'!x',str(e[1])+'!y',val=-(dzdbarw+dzdw).real)
+        dbgraph.add_edge(str(e[0])+'!x',str(e[1])+'!x',val=(-dzdbarw+dzdw).imag)
+        dbgraph.add_edge(str(e[0])+'!y',str(e[1])+'!y',val=-(dzdw+dzdbarw).imag)
+        dbgraph.add_edge(str(e[0])+'!y',str(e[1])+'!x',val=(dzdbarw-dzdw).real)
+        dbgraph.add_edge(str(e[1])+'!x',str(e[0])+'!y',val=-(dzdbarw+dzdw).real)
+        dbgraph.add_edge(str(e[1])+'!x',str(e[0])+'!x',val=(dzdw+dzdbarw).imag)
+        dbgraph.add_edge(str(e[1])+'!y',str(e[0])+'!y',val=(dzdbarw-dzdw).imag)
+        dbgraph.add_edge(str(e[1])+'!y',str(e[0])+'!x',val=(dzdbarw-dzdw).real)
+        
+    hessian = networkx.adjacency_matrix(dbgraph,nodelist=sorted(dbgraph.nodes()),weight='val').toarray()
     return hessian
 
+def hesspart(graph,vertex,hess,stab=0):
+    effects=[vertex]
+    for nb in graph.neighbors(vertex):
+        effects.append(nb)
+    vertices = sorted(graph.nodes())
+    for v in effects:
+        i = vertices.index(v)
+        dzdz=graph.node[v]['dzdz']
+        dzdbarz=graph.node[v]['dzdbarz']+stab
+        #print dzdz
+        #print dzdbarz
+        #(dzdz,dzdbarz)=graph.getVertex(vertex)[3:]
+        hess[2*i,2*i]=-dzdz.imag
+        hess[2*i+1,2*i+1]=dzdz.imag
+        hess[2*i,2*i+1]=-dzdbarz-dzdz.real
+        hess[2*i+1,2*i]=dzdbarz-dzdz.real
+    for e in graph.subgraph(effects).edges():
+        i = vertices.index(e[0])
+        j = vertices.index(e[1])
+        dzdw=graph.edge[e[0]][e[1]]['dzdw']
+        dzdbarw=graph.edge[e[0]][e[1]]['dzdbarw']
+        if graph.edge[e[0]][e[1]]['origin']==e[1]:
+            dzdbarw = np.conjugate(dzdbarw)
+        hess[2*i,2*j+1]=-(dzdbarw+dzdw).real
+        hess[2*i,2*j]=(-dzdbarw+dzdw).imag    
+        hess[2*i+1,2*j+1]=-(dzdw+dzdbarw).imag
+        hess[2*i+1,2*j]=(dzdbarw-dzdw).real
+        hess[2*j,2*i+1]=-(dzdbarw+dzdw).real
+        hess[2*j,2*i]=(dzdw+dzdbarw).imag
+        hess[2*j+1,2*i+1]=(dzdbarw-dzdw).imag
+        hess[2*j+1,2*i]=(dzdbarw-dzdw).real
+    return hess
+
 def realhess(graph):
+    if not graph.graph['jetcalc']:
+        jet2(graph)
     t=time.time()
     """computes the Hessian with given 2-jet"""
     dbgraph=networkx.DiGraph()
@@ -261,3 +338,4 @@ def initialize(graph):
         graph.add_node(vertex, upz=random.randint(0,1))
         graph.add_node(vertex, z=random.uniform(-2,2)+random.uniform(-2,2)*1j)
         #graph.setVertex(vertex, [random.randint(0,1),random.uniform(-2,2)+random.uniform(-2,2)*1j])
+    graph.graph['init']=True

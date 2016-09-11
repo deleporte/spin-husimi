@@ -10,15 +10,18 @@ def miniwell(graph,magn=0):
 
     Using a simple gradient descent, this function slowly finds a miniwell for a given graph. Now it works on two triangles.
     """
+    if not graph.graph['init']:
+        print "Graph not initialized !"
+        return -1
     count=0
     THRESHOLD=0.000002
     DIFF_STEP=0.000001
-    EPSILON=0.001
-    DESCENT=0.3
+    EPSILON=0.01
+    DESCENT=0.01
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
-    ham = jet1(graph,magn)
+    ham = hamil(graph,magn)
     jet2(graph,magn)
     M=hess(graph)
     mu = charac(M)
@@ -33,27 +36,33 @@ def miniwell(graph,magn=0):
         #computing the gradient
         grad=[]
         gradnorm=0
-        ham = jet1(graph,magn)
+        ham = hamil(graph,magn)
         jet2(graph,magn)
-        M=realhess(graph)
-        stab = max(0,-1.1*min(scipy.linalg.eigvalsh(M)))
-        mu = charac(hess(graph,stab))
+        M=hess(graph)
+        stab = 0.#max(0,-1.1*min(scipy.linalg.eigvalsh(M)))
+        mu = charac(M)
         for vertex in graph.nodes():
             z=graph.node[vertex]['z']
             graph.add_node(vertex,z=z+ DIFF_STEP)
-            varham= jet1(graph,magn)
-            jet2(graph,magn)
+            graph.graph['jetcalc']=False
+            varham= hamil(graph,magn)
+            jetpart(graph,vertex,magn)
+            #varmu = charac(hesspart(graph,vertex,M,stab))
             varmu = charac(hess(graph,stab))
             diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
             grad.append(diff)
             gradnorm+=diff**2
             graph.add_node(vertex,z=z+DIFF_STEP*1j)
-            varham= jet1(graph,magn)
-            jet2(graph,magn)
+            graph.graph['jetcalc']=False
+            varham= hamil(graph,magn)
+            jetpart(graph,vertex,magn)
+            #varmu = charac(hesspart(graph,vertex,M,stab))
             varmu = charac(hess(graph,stab))
             diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
+            #print varmu
             grad.append(diff)
             graph.add_node(vertex,z=z)
+            graph.graph['jetcalc']=False
             gradnorm+=diff**2
         if np.sqrt(gradnorm) < THRESHOLD*np.sqrt(N):
             at_miniwell=True
@@ -69,62 +78,47 @@ def miniwell(graph,magn=0):
                 z=4./z
                 graph.add_node(vertex,upz=upz)
             graph.add_node(vertex,z=z)
+        graph.graph['jetcalc']=False
 
-def well(graph):
+
+def well(graph,magn=0):
     """
     Input: an initialized graph
-    Output: The graph at a well
+    Output: The graph at a miniwell
 
-    Using a simple gradient descent, this function slowly finds a well for a given graph.
+    Using a simple gradient descent, this function slowly finds a miniwell for a given graph. Now it works on two triangles.
     """
+    if not graph.graph['init']:
+        print "Graph not initialized !"
+        return -1
     count=0
     THRESHOLD=0.000002
     DIFF_STEP=0.000001
-    EPSILON=0#.001
-    DESCENT=1.2
+    DESCENT=0.6
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
-    ham = jet1(graph)
-    #jet2(graph)
-    #mu = charac(hess(graph))
-    mu=0
+    ham = hamil(graph,magn)
     while not at_miniwell:
-        if not count%10:
-            z2u(graph)
-            s = distrib(graph)
-            #print "ham=",ham#,"and mu=",mu
-            #print "s=",s
-            count =0
-        count += 1
         #computing the gradient
         grad=[]
         gradnorm=0
-        ham = jet1(graph)
-        mu=0
-        varmu=0
-        #jet2(graph)
-        #mu = charac(hess(graph))
+        ham = hamil(graph,magn)
         for vertex in graph.nodes():
             z=graph.node[vertex]['z']
-            #[upz,z] = graph.getVertex(vertex)[:2]
             graph.add_node(vertex,z=z+ DIFF_STEP)
-            #graph.setVertex(vertex,[upz,z+ DIFF_STEP])
-            varham= jet1(graph)
-            #jet2(graph)
-            #varmu = charac(hess(graph))
-            diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
+            graph.graph['jetcalc']=False
+            varham= hamil(graph,magn)
+            diff=(varham-ham)/DIFF_STEP
             grad.append(diff)
             gradnorm+=diff**2
             graph.add_node(vertex,z=z+DIFF_STEP*1j)
-            #graph.setVertex(vertex,[upz,z+ DIFF_STEP*1j])
-            varham= jet1(graph)
-            #jet2(graph)
-            #varmu = charac(hess(graph))
-            diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
+            graph.graph['jetcalc']=False
+            varham= hamil(graph,magn)
+            diff=(varham-ham)/DIFF_STEP
             grad.append(diff)
             graph.add_node(vertex,z=z)
-            #graph.setVertex(vertex,[upz,z])
+            graph.graph['jetcalc']=False
             gradnorm+=diff**2
         if np.sqrt(gradnorm) < THRESHOLD*np.sqrt(N):
             at_miniwell=True
@@ -132,16 +126,17 @@ def well(graph):
         for (i,vertex) in enumerate(graph.nodes()):
             upz=graph.node[vertex]['upz']
             z=graph.node[vertex]['z']
-            #[upz,z] = graph.getVertex(vertex)[:2]
             step=grad[2*i]+grad[2*i+1]*1j
             step*=DESCENT
             z-=step
-            if abs(z) > 2.1:
+            if abs(z) > 4:
                 upz=1.-upz
                 z=4./z
                 graph.add_node(vertex,upz=upz)
             graph.add_node(vertex,z=z)
-            #graph.setVertex(vertex,[upz,z])    
+        graph.graph['jetcalc']=False
+
+  
 
 def show(hus):
     z2u(hus)

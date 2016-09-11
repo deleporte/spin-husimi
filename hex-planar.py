@@ -16,6 +16,7 @@ def inout():
     graph.add_node(34,z=jj)
     graph.add_node(5,z=jj)
     graph.add_node(61,z=jj)
+    graph.graph['init']=True
     return graph
 
 def windmill():
@@ -36,6 +37,7 @@ def windmill():
     graph.add_node(45,z=jj)
     graph.add_node(56,z=jj)
     graph.add_node(61,z=jj)
+    graph.graph['init']=True
     return graph
 
 def para():
@@ -56,6 +58,7 @@ def para():
     graph.add_node(3,z=jj)
     graph.add_node(45,z=jj)
     graph.add_node(6,z=jj)
+    graph.graph['init']=True
     return graph
 
 def hex345():
@@ -76,5 +79,6 @@ def hex345():
     graph.add_node(56,z=jj)
     graph.add_node(6,z=j)
     graph.add_node(61,z=jj)
+    graph.graph['init']=True
     return graph
 

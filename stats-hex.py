@@ -14,7 +14,7 @@ def statshex(samples):
         for j in range(1,samples):
             initialize(hus)
             well(hus)
-            jet1(hus)
+            hamil(hus)
             jet2(hus)
             mu=charac(hess(hus))
             if mu < 1.55:
