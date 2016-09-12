@@ -13,6 +13,7 @@ def vect(z):
     return np.array([ux,uy,uz])
 
 def z2u(graph):
+    """From stereographic representation to vectors on a sphere"""
     for vertex in graph.nodes():
         upz=graph.node[vertex]['upz']
         z=graph.node[vertex]['z']
@@ -24,6 +25,11 @@ def z2u(graph):
         graph.add_node(vertex,uz=u[2])
 
 def distrib(graph):
+    """Studies the space distribution of the spins.
+
+    Returns the length of the three principal axes.
+    If the last one is small, then the spins are coplanar.
+    """
     M=np.zeros((3,networkx.number_of_nodes(graph)))
     for (i,vertex) in enumerate(graph.nodes()):
         ux=graph.node[vertex]['ux']
@@ -40,8 +46,7 @@ def under(z,w,powz,poww):
     return (1.+abs(z)**2./4.)**powz*(1.+abs(w)**2./4.)**poww
 
 def hamil(graph, magn=0):
-    """computes the hamiltonian, for a given position (aka first three values attached do the edge)
-
+    """computes the hamiltonian, for a given position
     """
     if not graph.graph['init']:
         print "Graph not initialized !"
@@ -82,7 +87,7 @@ def hamil(graph, magn=0):
     return ham
 
 def jet2(graph,magn=0):
-    """computes the second jet, for a given position (aka first three values attached do the edge)
+    """computes the second jet, for a given position
 
     """
     if not graph.graph['init']:
@@ -139,6 +144,8 @@ def jet2(graph,magn=0):
     graph.graph['jetcalc']=True
     
 def jetpart(graph,vertex,magn=0):
+    """Updates the 2-jet when one spin is changed
+    """
     effects=[vertex]
     for nb in graph.neighbors(vertex):
         effects.append(nb)
@@ -202,6 +209,7 @@ def jetpart(graph,vertex,magn=0):
     graph.graph['jetcalc']=True
     
 def hess(graph,stab=0.):
+    """Computes J*the hessian"""
     if not graph.graph['init']:
         print "Graph not initialized !"
         return Nan
@@ -213,9 +221,6 @@ def hess(graph,stab=0.):
     for vertex in graph.nodes():
         dzdz=graph.node[vertex]['dzdz']
         dzdbarz=graph.node[vertex]['dzdbarz']+stab
-        #print dzdz
-        #print dzdbarz
-        #(dzdz,dzdbarz)=graph.getVertex(vertex)[3:]
         dbgraph.add_edge(str(vertex)+'!x',str(vertex)+'!x',val=-dzdz.imag)
         dbgraph.add_edge(str(vertex)+'!y',str(vertex)+'!y',val=dzdz.imag)
         dbgraph.add_edge(str(vertex)+'!x',str(vertex)+'!y',val=-dzdbarz-dzdz.real)
@@ -237,18 +242,18 @@ def hess(graph,stab=0.):
     hessian = networkx.adjacency_matrix(dbgraph,nodelist=sorted(dbgraph.nodes()),weight='val').toarray()
     return hessian
 
-def hesspart(graph,vertex,hess,stab=0):
+def hesspart(graph,vertex,hessprev,stab=0.):
+    """Updates the symplectic hessian when one spin is changed"""
+    hess=numpy.empty_like(hessprev)
+    hess[:] = hessprev
     effects=[vertex]
     for nb in graph.neighbors(vertex):
         effects.append(nb)
-    vertices = sorted(graph.nodes())
+    vertices = sorted(graph.nodes(),key=str)
     for v in effects:
         i = vertices.index(v)
         dzdz=graph.node[v]['dzdz']
         dzdbarz=graph.node[v]['dzdbarz']+stab
-        #print dzdz
-        #print dzdbarz
-        #(dzdz,dzdbarz)=graph.getVertex(vertex)[3:]
         hess[2*i,2*i]=-dzdz.imag
         hess[2*i+1,2*i+1]=dzdz.imag
         hess[2*i,2*i+1]=-dzdbarz-dzdz.real
@@ -271,6 +276,7 @@ def hesspart(graph,vertex,hess,stab=0):
     return hess
 
 def realhess(graph):
+    """Computes the standard hessian (definite symmetric)"""
     if not graph.graph['jetcalc']:
         jet2(graph)
     t=time.time()
@@ -298,7 +304,7 @@ def realhess(graph):
         dbgraph.add_edge(str(e[1])+'y',str(e[0])+'x',val=-(dzdbarw-dzdw).imag)
         dbgraph.add_edge(str(e[1])+'y',str(e[0])+'y',val=(dzdbarw-dzdw).real)
     
-    hessian = networkx.adjacency_matrix(dbgraph,weight='val').toarray()
+    hessian = networkx.adjacency_matrix(dbgraph,nodelist=sorted(dbgraph.nodes()),weight='val').toarray()
     return hessian
 
 
@@ -318,6 +324,7 @@ def charac(hessian):
     return mu
 
 def penalty(hessian):
+    """Computes how much the hessian is not positive"""
     eigs=scipy.linalg.eigvals(hessian).real
     p=0
     for value in eigs:
@@ -333,7 +340,7 @@ def penalty(hessian):
     #return mu
 
 def initialize(graph):
-    """Initializes the spins at random positions. Flushes the labels."""
+    """Initializes the spins at random positions."""
     for vertex in graph.nodes():
         graph.add_node(vertex, upz=random.randint(0,1))
         graph.add_node(vertex, z=random.uniform(-2,2)+random.uniform(-2,2)*1j)

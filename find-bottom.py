@@ -3,7 +3,76 @@ import scipy.linalg
 import scipy.sparse
 import random
 
-def miniwell(graph,magn=0):
+def gooddirections(graph):
+    """
+    From a graph configuration (at a minimum), gives a basis for the tangent space to the minimal set.
+    """
+    S=realhess(graph)
+    values,vectors=scipy.linalg.eigh(S)
+    threshold=4.*numpy.sqrt(hamil(graph))
+    directions=[]
+    for (i,val) in enumerate(values):
+        if val < threshold:
+            directions.append(vectors[i])
+    return directions
+
+def miniwell_sub(graph,magn=0):
+    """
+    Using a gradient descent, this function finds the minimal set for a given graph. Then, it uses a gradient descent on the tangent space of the minimal set.
+    """
+    THRESHOLD=0.000002
+    DIFF_STEP=0.000001
+    DESCENT=0.0005
+    at_well=False
+    at_miniwell=False
+    nodes=sorted(graph.nodes(),key=str)
+    N=len(nodes)
+    while not at_miniwell:
+        if not at_well:
+            well(graph)
+            at_well=True
+            print "Minimal set found."
+            ham=hamil(graph)
+        directions = gooddirections(graph)
+        print len(directions), "good directions."
+        mu = charac(hess(graph))
+        print mu
+        #computing the gradient
+        grad=[]
+        gradnorm=0.
+        for vector in directions:
+            for (i,vertex) in enumerate(nodes):
+                z=graph.node[vertex]['z']
+                z+= DIFF_STEP*(vector[2*i]+vector[2*i+1]*1j)
+                graph.add_node(vertex,z=z)
+            jet2(graph)
+            varmu=charac(hess(graph))
+            grad.append((varmu-mu)/DIFF_STEP)
+            gradnorm += ((varmu-mu)/DIFF_STEP)**2.
+            for (i,vertex) in enumerate(nodes):
+                z=graph.node[vertex]['z']
+                z-= DIFF_STEP*(vector[2*i]+vector[2*i+1]*1j)
+                graph.add_node(vertex,z=z)
+        if np.sqrt(gradnorm) < THRESHOLD*np.sqrt(N):
+            at_miniwell=True
+        #descent
+        move = numpy.empty_like(directions[0])
+        for (i,vector) in enumerate(directions):
+            move += DESCENT*grad[i]*vector
+        for (i,vertex) in enumerate(nodes):
+            z=graph.node[vertex]['z']
+            z -= move[2*i] + move[2*i+1]*1j
+            graph.add_node(vertex,z=z)
+            if abs(z)>2:
+                graph.add_node(vertex,upz=1-graph.node[vertex]['upz'])
+                graph.add_node(vertex,z=4./z)
+        if hamil(graph) > 0.01:
+            print "Got out !"
+            at_well=False
+        
+        
+
+def miniwell_gradient(graph,magn=0):
     """
     Input: an initialized graph
     Output: The graph at a miniwell
@@ -16,8 +85,8 @@ def miniwell(graph,magn=0):
     count=0
     THRESHOLD=0.000002
     DIFF_STEP=0.000001
-    EPSILON=0.01
-    DESCENT=0.01
+    EPSILON=0.001
+    DESCENT=0.1
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
@@ -47,8 +116,8 @@ def miniwell(graph,magn=0):
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             jetpart(graph,vertex,magn)
-            #varmu = charac(hesspart(graph,vertex,M,stab))
-            varmu = charac(hess(graph,stab))
+            varmu = charac(hesspart(graph,vertex,M,stab))
+            #varmu = charac(hess(graph,stab))
             diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
             grad.append(diff)
             gradnorm+=diff**2
@@ -56,8 +125,8 @@ def miniwell(graph,magn=0):
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             jetpart(graph,vertex,magn)
-            #varmu = charac(hesspart(graph,vertex,M,stab))
-            varmu = charac(hess(graph,stab))
+            varmu = charac(hesspart(graph,vertex,M,stab))
+            #varmu = charac(hess(graph,stab))
             diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
             #print varmu
             grad.append(diff)
@@ -136,7 +205,7 @@ def well(graph,magn=0):
             graph.add_node(vertex,z=z)
         graph.graph['jetcalc']=False
 
-  
+
 
 def show(hus):
     z2u(hus)
