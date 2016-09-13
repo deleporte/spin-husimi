@@ -41,17 +41,18 @@ def miniwell_sub(graph,magn=0):
         grad=[]
         gradnorm=0.
         for vector in directions:
+            zmem=[]
             for (i,vertex) in enumerate(nodes):
                 z=graph.node[vertex]['z']
-                z+= DIFF_STEP*(vector[2*i]+vector[2*i+1]*1j)
+                zmem.append(z)
+                z+=DIFF_STEP*(1.+abs(z)**2./4.)*(vector[2*i]+vector[2*i+1]*1j)
                 graph.add_node(vertex,z=z)
             jet2(graph)
             varmu=charac(hess(graph))
             grad.append((varmu-mu)/DIFF_STEP)
             gradnorm += ((varmu-mu)/DIFF_STEP)**2.
-            for (i,vertex) in enumerate(nodes):
-                z=graph.node[vertex]['z']
-                z-= DIFF_STEP*(vector[2*i]+vector[2*i+1]*1j)
+            for vertex in nodes[::-1]:
+                z=zmem.pop()
                 graph.add_node(vertex,z=z)
         if np.sqrt(gradnorm) < THRESHOLD*np.sqrt(N):
             at_miniwell=True
@@ -61,9 +62,9 @@ def miniwell_sub(graph,magn=0):
             move += DESCENT*grad[i]*vector
         for (i,vertex) in enumerate(nodes):
             z=graph.node[vertex]['z']
-            z -= move[2*i] + move[2*i+1]*1j
+            z -= (1.+abs(z)**2./4.)*(move[2*i] + move[2*i+1]*1j)
             graph.add_node(vertex,z=z)
-            if abs(z)>2:
+            if abs(z)>2.1:
                 graph.add_node(vertex,upz=1-graph.node[vertex]['upz'])
                 graph.add_node(vertex,z=4./z)
         if hamil(graph) > 0.01:
@@ -86,7 +87,7 @@ def miniwell_gradient(graph,magn=0):
     THRESHOLD=0.000002
     DIFF_STEP=0.000001
     EPSILON=0.001
-    DESCENT=0.1
+    DESCENT=0.05
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
@@ -112,7 +113,7 @@ def miniwell_gradient(graph,magn=0):
         mu = charac(M)
         for vertex in graph.nodes():
             z=graph.node[vertex]['z']
-            graph.add_node(vertex,z=z+ DIFF_STEP)
+            graph.add_node(vertex,z=z+ DIFF_STEP*(1.+abs(z)**2./4.))
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             jetpart(graph,vertex,magn)
@@ -121,7 +122,7 @@ def miniwell_gradient(graph,magn=0):
             diff=(varham-ham+EPSILON*(varmu-mu))/DIFF_STEP
             grad.append(diff)
             gradnorm+=diff**2
-            graph.add_node(vertex,z=z+DIFF_STEP*1j)
+            graph.add_node(vertex,z=z+DIFF_STEP*(1.+abs(z)**2./4.)*1j)
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             jetpart(graph,vertex,magn)
@@ -141,8 +142,9 @@ def miniwell_gradient(graph,magn=0):
             z=graph.node[vertex]['z']
             step=grad[2*i]+grad[2*i+1]*1j
             step*=DESCENT
+            step*=(1.+abs(z)**2./4.)
             z-=step
-            if abs(z) > 4:
+            if abs(z) > 2.1:
                 upz=1.-upz
                 z=4./z
                 graph.add_node(vertex,upz=upz)
@@ -163,7 +165,7 @@ def well(graph,magn=0):
     count=0
     THRESHOLD=0.000002
     DIFF_STEP=0.000001
-    DESCENT=0.6
+    DESCENT=0.2
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
@@ -173,15 +175,16 @@ def well(graph,magn=0):
         grad=[]
         gradnorm=0
         ham = hamil(graph,magn)
+        #print ham
         for vertex in graph.nodes():
             z=graph.node[vertex]['z']
-            graph.add_node(vertex,z=z+ DIFF_STEP)
+            graph.add_node(vertex,z=z+ DIFF_STEP*(1.+abs(z)**2./4.))
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             diff=(varham-ham)/DIFF_STEP
             grad.append(diff)
             gradnorm+=diff**2
-            graph.add_node(vertex,z=z+DIFF_STEP*1j)
+            graph.add_node(vertex,z=z+DIFF_STEP*(1.+abs(z)**2./4.)*1j)
             graph.graph['jetcalc']=False
             varham= hamil(graph,magn)
             diff=(varham-ham)/DIFF_STEP
@@ -197,8 +200,9 @@ def well(graph,magn=0):
             z=graph.node[vertex]['z']
             step=grad[2*i]+grad[2*i+1]*1j
             step*=DESCENT
+            step*=(1.+abs(z)**2./4.)
             z-=step
-            if abs(z) > 4:
+            if abs(z) > 2.1:
                 upz=1.-upz
                 z=4./z
                 graph.add_node(vertex,upz=upz)
