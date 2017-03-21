@@ -1,23 +1,29 @@
+def buildTwoHex():
+    graph= buildPolygon(6)
+    graph.add_edge('12','6')
+    graph.add_edge('12','26')
+    graph.add_edge('26','6')
+    graph.add_edge('6','67')
+    graph.add_edge('6','7')
+    graph.add_edge('67','7')
+    graph.add_edge('7','78')
+    graph.add_edge('7','8')
+    graph.add_edge('78','8')
+    graph.add_edge('8','23')
+    graph.add_edge('8','28')
+    graph.add_edge('28','23')
+    return graph
+
 def buildHex():
+    return buildPolygon(6)
+
+def buildPolygon(N=4):
     graph = networkx.Graph()
-    graph.add_edge(1,2)
-    graph.add_edge(2,3)
-    graph.add_edge(3,4)
-    graph.add_edge(4,5)
-    graph.add_edge(5,6)
-    graph.add_edge(6,1)
-    graph.add_edge(1,12)
-    graph.add_edge(12,2)
-    graph.add_edge(2,23)
-    graph.add_edge(23,3)
-    graph.add_edge(3,34)
-    graph.add_edge(34,4)
-    graph.add_edge(4,45)
-    graph.add_edge(45,5)
-    graph.add_edge(5,56)
-    graph.add_edge(56,6)
-    graph.add_edge(6,61)
-    graph.add_edge(61,1)
+    for k in range(N):
+        after=(k+1)%N
+        graph.add_edge(str(k),str(after))
+        graph.add_edge(str(k),str(k)+str(after))
+        graph.add_edge(str(after),str(k)+str(after))
     return graph
 
 def buildHusimiTree(skeleton):

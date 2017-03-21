@@ -2,6 +2,9 @@ import numpy as np
 import scipy.linalg
 import scipy.sparse
 import random
+import networkx
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 def gooddirections(graph):
     """
@@ -85,9 +88,9 @@ def miniwell_gradient(graph,magn=0):
         return -1
     count=0
     THRESHOLD=0.000002
-    DIFF_STEP=0.000001
-    EPSILON=0.001
-    DESCENT=0.05
+    DIFF_STEP=0.00001
+    EPSILON=0.01
+    DESCENT=0.04
     N=networkx.number_of_nodes(graph)
     #initialize(graph)
     at_miniwell= False
@@ -95,13 +98,25 @@ def miniwell_gradient(graph,magn=0):
     jet2(graph,magn)
     M=hess(graph)
     mu = charac(M)
-    while not at_miniwell:
+    plt.ion()
+    fig=plt.figure()
+    ax=fig.add_subplot(111, projection='3d')
+    points=ax.plot([],[],[],marker="o",color="b")[0]
+    points.set_linewidth(0)
+    zero=ax.scatter([0.],[0.],[0.],marker="o",color="r")
+    lines=[]
+    for k in range(len(graph.edges())):
+        lines.append(ax.plot([0,0],[0,0],[0,0],color="g")[0])
+    fig.canvas.draw()
+    plt.show(block=False)
+    image=0
+    #while not at_miniwell:
+    while count<1000:
         if not count%10:
             z2u(graph)
             s = distrib(graph)
             print "ham=",ham,"and mu=",mu
             #print "s=",s
-            count =0
         count += 1
         #computing the gradient
         grad=[]
@@ -150,12 +165,40 @@ def miniwell_gradient(graph,magn=0):
                 graph.add_node(vertex,upz=upz)
             graph.add_node(vertex,z=z)
         graph.graph['jetcalc']=False
-
+        #every 100th step we plot
+        if not count%100:
+            z2u(hus)
+            Xpoints=[]
+            Ypoints=[]
+            Zpoints=[]
+            for vertex in graph.nodes():
+                Xpoints.append(graph.node[vertex]['ux'])
+                Ypoints.append(graph.node[vertex]['uy'])
+                Zpoints.append(graph.node[vertex]['uz'])
+            points.remove()
+            points=ax.scatter(Xpoints,Ypoints,Zpoints,marker="o",color="b")
+            for (k,edge) in enumerate(graph.edges()):
+                Xlines=[]
+                Ylines=[]
+                Zlines=[]
+                Xlines.append(graph.node[edge[0]]['ux'])
+                Xlines.append(graph.node[edge[1]]['ux'])
+                Ylines.append(graph.node[edge[0]]['uy'])
+                Ylines.append(graph.node[edge[1]]['uy'])
+                Zlines.append(graph.node[edge[0]]['uz'])
+                Zlines.append(graph.node[edge[1]]['uz'])
+                lines[k].remove()
+                lines[k],=ax.plot(Xlines,Ylines,Zlines)
+                lines[k].set_color('g')
+            fig.canvas.draw()
+            count=0
+            fig.savefig('record/image'+str(image).zfill(3)+'.png', dpi=fig.dpi)
+            image += 1
 
 def well(graph,magn=0):
     """
     Input: an initialized graph
-    Output: The graph at a miniwell
+    Output: The graph at a well
 
     Using a simple gradient descent, this function slowly finds a miniwell for a given graph. Now it works on two triangles.
     """

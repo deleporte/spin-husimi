@@ -244,7 +244,7 @@ def hess(graph,stab=0.):
 
 def hesspart(graph,vertex,hessprev,stab=0.):
     """Updates the symplectic hessian when one spin is changed"""
-    hess=numpy.empty_like(hessprev)
+    hess=np.empty_like(hessprev)
     hess[:] = hessprev
     effects=[vertex]
     for nb in graph.neighbors(vertex):
